@@ -1,0 +1,15 @@
+Django
+djangorestframework
+djangorestframework-simplejwt
+django-filter
+drf-spectacular
+django-cors-headers
+python-decouple
+psycopg[binary]
+pandas
+numpy
+Pillow
+requests
+whitenoise
+drf-standardized-errors
+gunicorn

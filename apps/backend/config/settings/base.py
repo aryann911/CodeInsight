@@ -31,20 +31,36 @@ ALLOWED_HOSTS = config("ALLOWED_HOSTS").split(",")
 
 # Application definition
 
-INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
+# Django Apps
+DJANGO_APPS = [
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+]
 
+# Third-party Apps
+THIRD_PARTY_APPS = [
     "rest_framework",
     "rest_framework_simplejwt",
     "django_filters",
-
-    "apps.users",
 ]
+
+# Local Apps
+LOCAL_APPS = [
+    "apps.common",
+    "apps.users",
+    "apps.authentication",
+    "apps.analytics",
+    "apps.recommendations",
+    "apps.reports",
+    "apps.goals",
+    "apps.leetcode",
+]
+
+INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -144,3 +160,4 @@ REST_FRAMEWORK = {
 
     "PAGE_SIZE": 10,
 }
+
