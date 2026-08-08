@@ -26,8 +26,8 @@ class LeetCodeProfileSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         )
-
         read_only_fields = fields
+
 
 class ConnectLeetCodeSerializer(serializers.Serializer):
     """
@@ -40,14 +40,14 @@ class ConnectLeetCodeSerializer(serializers.Serializer):
     )
 
     def validate_username(self, value):
-        value = value.strip()
-
         if not value:
             raise serializers.ValidationError(
                 "LeetCode username is required."
             )
 
         return value
+
+
 class LeetCodeSubmissionSerializer(serializers.ModelSerializer):
     """
     Serializer for returning stored LeetCode submissions.
@@ -65,8 +65,8 @@ class LeetCodeSubmissionSerializer(serializers.ModelSerializer):
             "submitted_at",
             "created_at",
         )
-
         read_only_fields = fields
+
 
 class SubmissionSyncResultSerializer(serializers.Serializer):
     """

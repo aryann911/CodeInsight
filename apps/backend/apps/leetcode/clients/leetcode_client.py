@@ -15,10 +15,12 @@ class LeetCodeUserNotFoundError(LeetCodeClientError):
 
 class LeetCodeClient:
     """
-    Client for communicating with LeetCode GraphQL.
+    Client for communicating with the LeetCode GraphQL API.
     """
 
     GRAPHQL_URL = "https://leetcode.com/graphql"
+
+    USER_AGENT = "CodeInsight/1.0"
 
     PROFILE_QUERY = """
     query userProfile($username: String!) {
@@ -38,19 +40,32 @@ class LeetCodeClient:
     }
     """
 
+    RECENT_SUBMISSIONS_QUERY = """
+    query recentAcSubmissions($username: String!, $limit: Int!) {
+        recentAcSubmissionList(
+            username: $username
+            limit: $limit
+        ) {
+            id
+            title
+            titleSlug
+            timestamp
+            lang
+        }
+    }
+    """
+
     def __init__(self, timeout=10):
         self.timeout = timeout
 
-    def get_user_profile(self, username):
+    def _execute_query(self, query, variables):
         """
-        Fetch public profile and solved-problem statistics.
+        Execute a GraphQL query against LeetCode.
         """
 
         payload = {
-            "query": self.PROFILE_QUERY,
-            "variables": {
-                "username": username,
-            },
+            "query": query,
+            "variables": variables,
         }
 
         try:
@@ -59,7 +74,7 @@ class LeetCodeClient:
                 json=payload,
                 headers={
                     "Content-Type": "application/json",
-                    "User-Agent": "CodeInsight/1.0",
+                    "User-Agent": self.USER_AGENT,
                 },
                 timeout=self.timeout,
             )
@@ -73,6 +88,7 @@ class LeetCodeClient:
 
         try:
             result = response.json()
+
         except ValueError as exc:
             raise LeetCodeClientError(
                 "LeetCode returned an invalid response."
@@ -83,7 +99,21 @@ class LeetCodeClient:
                 "LeetCode returned an error."
             )
 
-        matched_user = result.get("data", {}).get("matchedUser")
+        return result.get("data", {})
+
+    def get_user_profile(self, username):
+        """
+        Fetch a user's public profile and solved-problem statistics.
+        """
+
+        data = self._execute_query(
+            query=self.PROFILE_QUERY,
+            variables={
+                "username": username,
+            },
+        )
+
+        matched_user = data.get("matchedUser")
 
         if matched_user is None:
             raise LeetCodeUserNotFoundError(
@@ -91,70 +121,26 @@ class LeetCodeClient:
             )
 
         return matched_user
-    RECENT_SUBMISSIONS_QUERY = """
-query recentAcSubmissions($username: String!, $limit: Int!) {
-    recentAcSubmissionList(
-        username: $username
-        limit: $limit
-    ) {
-        id
-        title
-        titleSlug
-        timestamp
-        lang
-    }
-}
-"""
 
-    def get_recent_submissions(self, username, limit=20):
+    def get_recent_submissions(
+        self,
+        username,
+        limit=20,
+    ):
         """
         Fetch recent accepted submissions for a LeetCode user.
         """
 
-        payload = {
-            "query": self.RECENT_SUBMISSIONS_QUERY,
-            "variables": {
+        data = self._execute_query(
+            query=self.RECENT_SUBMISSIONS_QUERY,
+            variables={
                 "username": username,
                 "limit": limit,
             },
-        }
+        )
 
-        try:
-            response = requests.post(
-                self.GRAPHQL_URL,
-                json=payload,
-                headers={
-                    "Content-Type": "application/json",
-                    "User-Agent": "CodeInsight/1.0",
-                },
-                timeout=self.timeout,
-            )
+        submissions = data.get(
+            "recentAcSubmissionList"
+        )
 
-            response.raise_for_status()
-
-        except requests.RequestException as exc:
-            raise LeetCodeClientError(
-                "Unable to communicate with LeetCode."
-            ) from exc
-
-        try:
-            result = response.json()
-
-        except ValueError as exc:
-            raise LeetCodeClientError(
-                "LeetCode returned an invalid response."
-            ) from exc
-
-        if result.get("errors"):
-            raise LeetCodeClientError(
-                "LeetCode returned an error."
-            )
-
-        data = result.get("data") or {}
-
-        submissions = data.get("recentAcSubmissionList")
-
-        if submissions is None:
-            return []
-
-        return submissions
+        return submissions or []

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from django.db import transaction
 
@@ -12,11 +12,17 @@ from apps.leetcode.models import (
 )
 
 
-def sync_recent_submissions(user, limit=20):
+def sync_recent_submissions(
+    user,
+    limit: int = 20,
+) -> int:
     """
-    Fetch and store recent accepted LeetCode submissions.
+    Fetch and store a user's recent accepted LeetCode submissions.
 
-    Returns the number of newly created submissions.
+    Existing submissions are skipped using the unique submission_id.
+
+    Returns:
+        int: Number of newly created submissions.
     """
 
     try:
@@ -47,42 +53,47 @@ def sync_recent_submissions(user, limit=20):
         for submission in submissions:
 
             submission_id = submission.get("id")
-
-            # Ignore malformed external records
-            if not submission_id:
-                continue
-
             timestamp = submission.get("timestamp")
 
-            if not timestamp:
+            if not submission_id or not timestamp:
                 continue
 
             try:
                 submitted_at = datetime.fromtimestamp(
                     int(timestamp),
-                    tz=timezone.utc,
+                    tz=UTC,
                 )
-            except (TypeError, ValueError, OverflowError):
+
+            except (
+                TypeError,
+                ValueError,
+                OverflowError,
+            ):
                 continue
 
-            _, created = (
-                LeetCodeSubmission.objects.get_or_create(
-                    submission_id=str(submission_id),
-                    defaults={
-                        "profile": profile,
-                        "title": submission.get("title", ""),
-                        "title_slug": submission.get(
-                            "titleSlug",
-                            "",
-                        ),
-                        "status": "Accepted",
-                        "language": submission.get(
-                            "lang",
-                            "",
-                        ),
-                        "submitted_at": submitted_at,
-                    },
-                )
+            _, created = LeetCodeSubmission.objects.get_or_create(
+                submission_id=str(submission_id),
+                defaults={
+                    "profile": profile,
+                    "title": submission.get(
+                        "title",
+                        "",
+                    ),
+                    "title_slug": submission.get(
+                        "titleSlug",
+                        "",
+                    ),
+                    "status": "Accepted",
+                    "language": submission.get(
+                        "lang",
+                        "",
+                    ),
+                    # The current LeetCode GraphQL endpoint
+                    # does not expose difficulty in
+                    # recentAcSubmissionList.
+                    "difficulty": "",
+                    "submitted_at": submitted_at,
+                },
             )
 
             if created:

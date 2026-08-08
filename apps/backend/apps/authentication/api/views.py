@@ -77,6 +77,7 @@ class LoginAPIView(GenericAPIView):
             )
 
         data = authenticate_user(serializer.validated_data["user"])
+        data["user"] = UserSerializer(data["user"]).data
 
         return success_response(
             message="Login successful.",
@@ -253,7 +254,7 @@ from rest_framework_simplejwt.exceptions import (
 
 from apps.authentication.api.serializers import RefreshTokenSerializer
 from apps.authentication.services.auth_service import refresh_access_token
-from apps.common.responses import error_response, success_response
+
 
 @extend_schema(
     tags=["Authentication"],

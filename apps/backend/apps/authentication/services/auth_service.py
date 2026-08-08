@@ -1,4 +1,16 @@
+from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
+from django.core.exceptions import ValidationError
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import (
+    urlsafe_base64_decode,
+    urlsafe_base64_encode,
+)
+
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.tokens import RefreshToken
 
 User = get_user_model()
 
@@ -7,15 +19,13 @@ def register_user(validated_data: dict):
     """
     Create and return a new user.
     """
-
     data = validated_data.copy()
 
-    # Remove fields that are not stored
     data.pop("password_confirm")
-
     password = data.pop("password")
 
     user = User(**data)
+
     try:
         validate_password(password, user)
     except ValidationError as exc:
@@ -27,23 +37,17 @@ def register_user(validated_data: dict):
     return user
 
 
-from rest_framework_simplejwt.tokens import RefreshToken
-
-from apps.authentication.api.serializers import UserSerializer
-
-
 def authenticate_user(user):
+    """
+    Generate JWT tokens for the authenticated user.
+    """
     refresh = RefreshToken.for_user(user)
 
     return {
         "access": str(refresh.access_token),
         "refresh": str(refresh),
-        "user": UserSerializer(user).data,
+        "user": user,
     }
-
-
-from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.exceptions import TokenError
 
 
 def logout_user(refresh_token):
@@ -51,23 +55,26 @@ def logout_user(refresh_token):
     Blacklist a refresh token.
     """
     try:
-        token = RefreshToken(refresh_token)
-        token.blacklist()
+        RefreshToken(refresh_token).blacklist()
     except TokenError:
-        raise ValueError("Invalid or expired refresh token.")
-    
-
-from django.contrib.auth.password_validation import validate_password
-from django.core.exceptions import ValidationError
+        raise ValueError(
+            "Invalid or expired refresh token."
+        )
 
 
-def change_password(user, old_password, new_password):
+def change_password(
+    user,
+    old_password,
+    new_password,
+):
     """
     Change the password of an authenticated user.
     """
 
     if not user.check_password(old_password):
-        raise ValueError("Old password is incorrect.")
+        raise ValueError(
+            "Old password is incorrect."
+        )
 
     if old_password == new_password:
         raise ValueError(
@@ -75,34 +82,38 @@ def change_password(user, old_password, new_password):
         )
 
     try:
-        validate_password(new_password, user)
+        validate_password(
+            new_password,
+            user,
+        )
     except ValidationError as exc:
         raise ValueError(exc.messages)
 
     user.set_password(new_password)
     user.save(update_fields=["password"])
 
-from django.contrib.auth.tokens import PasswordResetTokenGenerator
-from django.utils.encoding import force_bytes
-from django.utils.http import urlsafe_base64_encode
-
-
 
 def forgot_password(email):
     """
-    Generate a password reset token for the user.
+    Generate a password reset link.
     """
 
     try:
-        user = User.objects.get(email__iexact=email)
+        user = User.objects.get(
+            email__iexact=email
+        )
     except User.DoesNotExist:
         return None
 
     token = PasswordResetTokenGenerator().make_token(user)
-    uid = urlsafe_base64_encode(force_bytes(user.pk))
+
+    uid = urlsafe_base64_encode(
+        force_bytes(user.pk)
+    )
 
     reset_link = (
-        f"http://localhost:5173/reset-password/"
+        f"{settings.FRONTEND_URL}"
+        f"/reset-password/"
         f"?uid={uid}&token={token}"
     )
 
@@ -113,32 +124,62 @@ def forgot_password(email):
 
     return reset_link
 
-from django.utils.http import urlsafe_base64_decode
-from django.utils.encoding import force_str
 
-def reset_password(uid, token, new_password):
+def reset_password(
+    uid,
+    token,
+    new_password,
+):
     """
-    Reset a user's password using a valid reset token.
+    Reset a user's password.
     """
 
     try:
-        user_id = force_str(urlsafe_base64_decode(uid))
-        user = User.objects.get(pk=user_id)
-    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-        raise ValueError("Invalid reset link.")
+        user_id = force_str(
+            urlsafe_base64_decode(uid)
+        )
 
-    token_generator = PasswordResetTokenGenerator()
+        user = User.objects.get(
+            pk=user_id
+        )
 
-    if not token_generator.check_token(user, token):
-        raise ValueError("Reset link is invalid or has expired.")
+    except (
+        TypeError,
+        ValueError,
+        OverflowError,
+        User.DoesNotExist,
+    ):
+        raise ValueError(
+            "Invalid reset link."
+        )
+
+    generator = PasswordResetTokenGenerator()
+
+    if not generator.check_token(
+        user,
+        token,
+    ):
+        raise ValueError(
+            "Reset link is invalid or has expired."
+        )
 
     try:
-        validate_password(new_password, user)
+        validate_password(
+            new_password,
+            user,
+        )
     except ValidationError as exc:
         raise ValueError(exc.messages)
 
     user.set_password(new_password)
     user.save(update_fields=["password"])
+
+
 def refresh_access_token(serializer):
-    serializer.is_valid(raise_exception=True)
+    """
+    Return validated refresh token data.
+    """
+    serializer.is_valid(
+        raise_exception=True
+    )
     return serializer.validated_data

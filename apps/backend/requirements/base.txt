@@ -12,4 +12,3 @@ Pillow
 requests
 whitenoise
 drf-standardized-errors
-gunicorn
